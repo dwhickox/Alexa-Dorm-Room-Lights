@@ -35,6 +35,7 @@ int lightstate = 0;
 int lightsense = D3;
 int touchsense = D4;
 int ws2812 = D5;
+int touchcheck = 0;
 
 
 
@@ -54,13 +55,13 @@ void setup() {
   Serial.begin(115200);
   //sets up rtc
   rtcObject.Begin();    //Starts I2C
-  RtcDateTime currentTime = RtcDateTime(17,06,07,12,50,0); //define date and time object
-  rtcObject.SetDateTime(currentTime);   
+  RtcDateTime currentTime = RtcDateTime(17, 06, 07, 12, 50, 0); //define date and time object
+  rtcObject.SetDateTime(currentTime);
 
   //Setup the pins for input
   pinMode(lightsense, INPUT);
   pinMode(touchsense, INPUT);
-  
+
   // Setup the pin for output:
   pinMode(ws2812, OUTPUT);
   digitalWrite(ws2812, LOW); // makes sure there is no odd data in the led
@@ -88,7 +89,7 @@ void setup() {
 
   // Connect to UDP:
   bool udpConnected = connectUDP();
-  if (udpConnected){
+  if (udpConnected) {
     startHttpServer(); // Start the HTTP Server
   }
 
@@ -101,7 +102,7 @@ void loop() {
   // If there are packets, we parse them:
   int packetSize = UDP.parsePacket();
 
-  if(packetSize) {
+  if (packetSize) {
     if (debug) {
       Serial.println("");
       Serial.print("Received packet of size ");
@@ -109,7 +110,7 @@ void loop() {
       Serial.print("From ");
       IPAddress remote = UDP.remoteIP();
 
-      for (int i =0; i < 4; i++) {
+      for (int i = 0; i < 4; i++) {
         Serial.print(remote[i], DEC);
         if (i < 3) {
           Serial.print(".");
@@ -128,8 +129,8 @@ void loop() {
 
     String request = packetBuffer;
 
-    if(request.indexOf('M-SEARCH') > 0) {
-      if(request.indexOf("urn:Belkin:device:**") > 0) {
+    if (request.indexOf('M-SEARCH') > 0) {
+      if (request.indexOf("urn:Belkin:device:**") > 0) {
         if (debug) {
           Serial.println("Responding to search request ...");
         }
@@ -137,7 +138,7 @@ void loop() {
       }
     }
   }
-  
+
   delay(10);
 }
 
@@ -145,23 +146,23 @@ void prepareIds() {
   uint32_t chipId = ESP.getChipId();
   char uuid[64];
   sprintf_P(uuid, PSTR("38323636-4558-4dda-9188-cda0e6%02x%02x%02x"),
-  (uint16_t) ((chipId >> 16) & 0xff),
-  (uint16_t) ((chipId >>  8) & 0xff),
-  (uint16_t)   chipId        & 0xff);
+            (uint16_t) ((chipId >> 16) & 0xff),
+            (uint16_t) ((chipId >>  8) & 0xff),
+            (uint16_t)   chipId        & 0xff);
 
   serial = String(uuid);
   persistent_uuid = "Socket-1_0-" + serial;
 }
 
-bool connectUDP(){
+bool connectUDP() {
   boolean state = false;
   Serial.println("Connecting to UDP");
 
-  if(UDP.beginMulticast(WiFi.localIP(), ipMulti, portMulti)) {
+  if (UDP.beginMulticast(WiFi.localIP(), ipMulti, portMulti)) {
     Serial.println("Connection successful");
     state = true;
   }
-  else{
+  else {
     Serial.println("Connection failed");
   }
 
@@ -169,7 +170,7 @@ bool connectUDP(){
 }
 
 void startHttpServer() {
-  HTTP.on("/index.html", HTTP_GET, [](){
+  HTTP.on("/index.html", HTTP_GET, []() {
     if (debug) {
       Serial.println("Got Request index.html ...\n");
     }
@@ -178,7 +179,7 @@ void startHttpServer() {
 
   HTTP.on("/upnp/control/basicevent1", HTTP_POST, []() {
     if (debug) {
-    Serial.println("########## Responding to  /upnp/control/basicevent1 ... ##########");
+      Serial.println("########## Responding to  /upnp/control/basicevent1 ... ##########");
     }
 
 
@@ -193,17 +194,17 @@ void startHttpServer() {
     }
 
 
-    if(request.indexOf("<BinaryState>1</BinaryState>") > 0) {
+    if (request.indexOf("<BinaryState>1</BinaryState>") > 0) {
       if (squawk) {
-          Serial.println("Got on request");
+        Serial.println("Got on request");
       }
 
       digitalWrite(relayPin, LOW); // turn on relay with voltage LOW
     }
 
-    if(request.indexOf("<BinaryState>0</BinaryState>") > 0) {
+    if (request.indexOf("<BinaryState>0</BinaryState>") > 0) {
       if (squawk) {
-          Serial.println("Got off request");
+        Serial.println("Got off request");
       }
 
       digitalWrite(relayPin, HIGH); // turn on relay with voltage HIGH
@@ -212,45 +213,45 @@ void startHttpServer() {
     HTTP.send(200, "text/plain", "");
   });
 
-  HTTP.on("/eventservice.xml", HTTP_GET, [](){
+  HTTP.on("/eventservice.xml", HTTP_GET, []() {
     if (debug) {
-        Serial.println(" ########## Responding to eventservice.xml ... ########\n");
+      Serial.println(" ########## Responding to eventservice.xml ... ########\n");
     }
 
     String eventservice_xml = "<?scpd xmlns=\"urn:Belkin:service-1-0\"?>"
-    "<actionList>"
-    "<action>"
-    "<name>SetBinaryState</name>"
-    "<argumentList>"
-    "<argument>"
-    "<retval/>"
-    "<name>BinaryState</name>"
-    "<relatedStateVariable>BinaryState</relatedStateVariable>"
-    "<direction>in</direction>"
-    "</argument>"
-    "</argumentList>"
-    "<serviceStateTable>"
-    "<stateVariable sendEvents=\"yes\">"
-    "<name>BinaryState</name>"
-    "<dataType>Boolean</dataType>"
-    "<defaultValue>0</defaultValue>"
-    "</stateVariable>"
-    "<stateVariable sendEvents=\"yes\">"
-    "<name>level</name>"
-    "<dataType>string</dataType>"
-    "<defaultValue>0</defaultValue>"
-    "</stateVariable>"
-    "</serviceStateTable>"
-    "</action>"
-    "</scpd>\r\n"
-    "\r\n";
+                              "<actionList>"
+                              "<action>"
+                              "<name>SetBinaryState</name>"
+                              "<argumentList>"
+                              "<argument>"
+                              "<retval/>"
+                              "<name>BinaryState</name>"
+                              "<relatedStateVariable>BinaryState</relatedStateVariable>"
+                              "<direction>in</direction>"
+                              "</argument>"
+                              "</argumentList>"
+                              "<serviceStateTable>"
+                              "<stateVariable sendEvents=\"yes\">"
+                              "<name>BinaryState</name>"
+                              "<dataType>Boolean</dataType>"
+                              "<defaultValue>0</defaultValue>"
+                              "</stateVariable>"
+                              "<stateVariable sendEvents=\"yes\">"
+                              "<name>level</name>"
+                              "<dataType>string</dataType>"
+                              "<defaultValue>0</defaultValue>"
+                              "</stateVariable>"
+                              "</serviceStateTable>"
+                              "</action>"
+                              "</scpd>\r\n"
+                              "\r\n";
 
     HTTP.send(200, "text/plain", eventservice_xml.c_str());
   });
 
-  HTTP.on("/setup.xml", HTTP_GET, [](){
+  HTTP.on("/setup.xml", HTTP_GET, []() {
     if (debug) {
-        Serial.println(" ########## Responding to setup.xml ... ########\n");
+      Serial.println(" ########## Responding to setup.xml ... ########\n");
     }
 
 
@@ -259,28 +260,28 @@ void startHttpServer() {
     sprintf(s, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
 
     String setup_xml = "<?xml version=\"1.0\"?>"
-    "<root>"
-    "<device>"
-    "<deviceType>urn:Belkin:device:controllee:1</deviceType>"
-    "<friendlyName>"+ device_name +"</friendlyName>"
-    "<manufacturer>Belkin International Inc.</manufacturer>"
-    "<modelName>Emulated Socket</modelName>"
-    "<modelNumber>3.1415</modelNumber>"
-    "<UDN>uuid:"+ persistent_uuid +"</UDN>"
-    "<serialNumber>221517K0101769</serialNumber>"
-    "<binaryState>0</binaryState>"
-    "<serviceList>"
-    "<service>"
-    "<serviceType>urn:Belkin:service:basicevent:1</serviceType>"
-    "<serviceId>urn:Belkin:serviceId:basicevent1</serviceId>"
-    "<controlURL>/upnp/control/basicevent1</controlURL>"
-    "<eventSubURL>/upnp/event/basicevent1</eventSubURL>"
-    "<SCPDURL>/eventservice.xml</SCPDURL>"
-    "</service>"
-    "</serviceList>"
-    "</device>"
-    "</root>\r\n"
-    "\r\n";
+                       "<root>"
+                       "<device>"
+                       "<deviceType>urn:Belkin:device:controllee:1</deviceType>"
+                       "<friendlyName>" + device_name + "</friendlyName>"
+                       "<manufacturer>Belkin International Inc.</manufacturer>"
+                       "<modelName>Emulated Socket</modelName>"
+                       "<modelNumber>3.1415</modelNumber>"
+                       "<UDN>uuid:" + persistent_uuid + "</UDN>"
+                       "<serialNumber>221517K0101769</serialNumber>"
+                       "<binaryState>0</binaryState>"
+                       "<serviceList>"
+                       "<service>"
+                       "<serviceType>urn:Belkin:service:basicevent:1</serviceType>"
+                       "<serviceId>urn:Belkin:serviceId:basicevent1</serviceId>"
+                       "<controlURL>/upnp/control/basicevent1</controlURL>"
+                       "<eventSubURL>/upnp/event/basicevent1</eventSubURL>"
+                       "<SCPDURL>/eventservice.xml</SCPDURL>"
+                       "</service>"
+                       "</serviceList>"
+                       "</device>"
+                       "</root>\r\n"
+                       "\r\n";
 
     HTTP.send(200, "text/xml", setup_xml.c_str());
     if (debug) {
@@ -309,17 +310,17 @@ void respondToSearch() {
   sprintf(s, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
 
   String response =
-  "HTTP/1.1 200 OK\r\n"
-  "CACHE-CONTROL: max-age=86400\r\n"
-  "DATE: Tue, 14 Dec 2016 02:30:00 GMT\r\n"
-  "EXT:\r\n"
-  "LOCATION: http://" + String(s) + ":80/setup.xml\r\n"
-  "OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n"
-  "01-NLS: b9200ebb-736d-4b93-bf03-835149d13983\r\n"
-  "SERVER: Unspecified, UPnP/1.0, Unspecified\r\n"
-  "ST: urn:Belkin:device:**\r\n"
-  "USN: uuid:" + persistent_uuid + "::urn:Belkin:device:**\r\n"
-  "X-User-Agent: redsonic\r\n\r\n";
+    "HTTP/1.1 200 OK\r\n"
+    "CACHE-CONTROL: max-age=86400\r\n"
+    "DATE: Tue, 14 Dec 2016 02:30:00 GMT\r\n"
+    "EXT:\r\n"
+    "LOCATION: http://" + String(s) + ":80/setup.xml\r\n"
+    "OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n"
+    "01-NLS: b9200ebb-736d-4b93-bf03-835149d13983\r\n"
+    "SERVER: Unspecified, UPnP/1.0, Unspecified\r\n"
+    "ST: urn:Belkin:device:**\r\n"
+    "USN: uuid:" + persistent_uuid + "::urn:Belkin:device:**\r\n"
+    "X-User-Agent: redsonic\r\n\r\n";
 
   UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
   UDP.write(response.c_str());
@@ -336,4 +337,26 @@ void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println("WiFi Manager: Please connect to AP:");
   Serial.println(myWiFiManager->getConfigPortalSSID());
   Serial.println("To setup WiFi Configuration");
+}
+
+void touch() {
+  if (digitalRead(touchsense) == HIGH && touchcheck == 0)
+  {
+    touchcheck = 1;
+    if (touchstate == 0)
+    {
+      touchstate = 1;
+      Serial.println("touchstate one");
+    }
+    else
+    {
+      touchstate = 0;
+      Serial.println("touchstate off")
+    }
+  }
+  else
+  {
+    touchcheck = 0;
+    delay(100)// just to make sure that when the finger comes off the output is not feathered
+  }
 }
