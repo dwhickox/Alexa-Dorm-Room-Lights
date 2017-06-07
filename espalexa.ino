@@ -41,7 +41,9 @@ int lightcheckhigh = 0;
 int lightchecklow = 0;
 int lightmilli = 0;
 int hierchange = 0;
-int hierchange = 
+int hierold = 0;
+int hiernew = 0;
+int hierchangeamount = 0;
 #define WS2812pin D6
 #define LED_COUNT 1
 
@@ -435,11 +437,25 @@ void rgb(){
 }
 
 void hierarchy(){
+  //key alexastate, touchstate, timestate, lightstate
+  //binary 4 digets 
+  hiernew = alexastate*1000+touchstate*100+timestate*10+lightstate;
   
+  if (hierold != hiernew)
+  {
+    hierchange = 1;
+    hierchangeamount = abs(hiernew - hierold);
+    hierold = hiernew;
+  }
   
-  if ((alexastate == 1 || touchstate == 1 || timestate == 1) and hierchange == 0)
+  if ((alexastate == 1 || touchstate == 1 || timestate == 1 || lightstate == 1) and hierchange == 1)
   {
     digitalWrite(relayPin, LOW);   // if Touch sensor is HIGH, then turn on
     Serial.println("light ON");
+  }
+  if (alexastate == 0 && hierchange == 1 && hierchangeamount >= 1000)
+  {
+    digitalWrite(relayPin, HIGH);
+    Serial.println("light off");
   }
 }
