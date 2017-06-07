@@ -1,3 +1,4 @@
+#include <Adafruit_NeoPixel.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -39,8 +40,14 @@ int touchcheck = 0;
 int lightcheckhigh = 0;
 int lightchecklow = 0;
 int lightmilli = 0;
+int hierchange = 0;
+int hierchange = 
+#define WS2812pin D6
+#define LED_COUNT 1
 
 
+//Setup the ws2812 indicator
+Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, WS2812pin, NEO_GRB + NEO_KHZ800);
 
 // Some UDP / WeMo specific variables:
 WiFiUDP UDP;
@@ -56,11 +63,13 @@ char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
 void setup() {
   // Begin Serial:
   Serial.begin(115200);
+  //begin the led driver
+  leds.begin();
+  
   //sets up rtc
   rtcObject.Begin();    //Starts I2C
   RtcDateTime currentTime = RtcDateTime(17, 06, 07, 12, 50, 0); //define date and time object
   rtcObject.SetDateTime(currentTime);
-
   //Setup the pins for input
   pinMode(lightsense, INPUT);
   pinMode(touchsense, INPUT);
@@ -199,18 +208,18 @@ void startHttpServer() {
 
     if (request.indexOf("<BinaryState>1</BinaryState>") > 0) {
       if (squawk) {
-        Serial.println("Got on request");
+        Serial.println("Got Alexa on request");
       }
 
-      digitalWrite(relayPin, LOW); // turn on relay with voltage LOW
+      alexastate = 1;
     }
 
     if (request.indexOf("<BinaryState>0</BinaryState>") > 0) {
       if (squawk) {
-        Serial.println("Got off request");
+        Serial.println("Got Alexa off request");
       }
 
-      digitalWrite(relayPin, HIGH); // turn on relay with voltage HIGH
+      alexastate = 0;
     }
 
     HTTP.send(200, "text/plain", "");
@@ -354,13 +363,13 @@ void touch() {
     else
     {
       touchstate = 0;
-      Serial.println("touchstate off")
+      Serial.println("touchstate off");
     }
   }
   else
   {
     touchcheck = 0;
-    delay(100)// just to make sure that when the finger comes off the output is not feathered
+    delay(100);// just to make sure that when the finger comes off the output is not feathered
   }
 }
 void light() {
@@ -378,7 +387,7 @@ void light() {
       {
         lightmilli = millis();
       }
-      else if (millis - lightmilli >= 60000)
+      else if (millis() - lightmilli >= 60000)
       {
         lightcheckhigh = 0;
         lightstate == 0;
@@ -405,7 +414,7 @@ void light() {
       {
         lightmilli = millis();
       }
-      else if (millis - lightmilli >= 60000)
+      else if ((millis() - lightmilli) >= 60000)
       {
         lightchecklow = 0;
         lightstate == 1;
@@ -417,5 +426,20 @@ void light() {
   {
     lightchecklow = 0;
     lightcheckhigh = 0;
+  }
+}
+
+void rgb(){
+  //this will be an error indicator in the future, but for now you get a nice purple
+  leds.setPixelColor(4, 0xFF00FF);
+}
+
+void hierarchy(){
+  
+  
+  if ((alexastate == 1 || touchstate == 1 || timestate == 1) and hierchange == 0)
+  {
+    digitalWrite(relayPin, LOW);   // if Touch sensor is HIGH, then turn on
+    Serial.println("light ON");
   }
 }
