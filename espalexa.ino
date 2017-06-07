@@ -36,6 +36,9 @@ int lightsense = D3;
 int touchsense = D4;
 int ws2812 = D5;
 int touchcheck = 0;
+int lightcheckhigh = 0;
+int lightchecklow = 0;
+int lightmilli = 0;
 
 
 
@@ -346,7 +349,7 @@ void touch() {
     if (touchstate == 0)
     {
       touchstate = 1;
-      Serial.println("touchstate one");
+      Serial.println("touchstate on");
     }
     else
     {
@@ -358,5 +361,61 @@ void touch() {
   {
     touchcheck = 0;
     delay(100)// just to make sure that when the finger comes off the output is not feathered
+  }
+}
+void light() {
+  if(digitalRead(lightsense) == HIGH && lightstate == 1)
+  {
+    if (lightcheckhigh = 0)
+    {
+      lightchecklow = 0;
+      lightcheckhigh = 1;
+      lightmilli = millis();
+    }
+    else
+    {
+      if (millis - lightmilli < 0)
+      {
+        lightmilli = millis();
+      }
+      else if (millis - lightmilli >= 60000)
+      {
+        lightcheckhigh = 0;
+        lightstate == 0;
+        Serial.println("lightstate off");
+      }
+    }
+  }
+  else if(digitalRead(lightsense) == HIGH && lightstate == 0)
+  {
+    lightchecklow = 0;
+    lightcheckhigh = 0;
+  }
+  else if(digitalRead(lightsense) == LOW && lightstate == 0)
+  {
+    if (lightchecklow = 0)
+    {
+      lightchecklow = 1;
+      lightcheckhigh = 0;
+      lightmilli = millis();
+    }
+    else
+    {
+      if (millis - lightmilli < 0)
+      {
+        lightmilli = millis();
+      }
+      else if (millis - lightmilli >= 60000)
+      {
+        lightchecklow = 0;
+        lightstate == 1;
+        Serial.println("lightstate on");
+      }
+    }
+  }
+  else if(digitalRead(lightsense) == LOW && lightstate == 1)
+  {
+    lightchecklow = 0;
+    lightcheckhigh = 0;
   }
 }
