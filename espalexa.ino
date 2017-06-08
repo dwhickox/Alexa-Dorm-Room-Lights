@@ -44,12 +44,12 @@ int hierchange = 0;
 int hierold = 0;
 int hiernew = 0;
 int hierchangeamount = 0;
-#define WS2812pin D6
+#define PIN D5
 #define LED_COUNT 1
-
+#define BRIGHTNESS 50
 
 //Setup the ws2812 indicator
-Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, WS2812pin, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800);
 
 // Some UDP / WeMo specific variables:
 WiFiUDP UDP;
@@ -65,9 +65,11 @@ char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
 void setup() {
   // Begin Serial:
   Serial.begin(115200);
-  //begin the led driver
-  leds.begin();
-  
+  delay(1000);
+  pixels.begin();
+  pixels.show(); // Initialize all pixels to 'off'
+  Serial.println("pixels cleared");
+  delay(4000);
   //sets up rtc
   rtcObject.Begin();    //Starts I2C
   RtcDateTime currentTime = RtcDateTime(17, 06, 07, 12, 50, 0); //define date and time object
@@ -152,7 +154,11 @@ void loop() {
       }
     }
   }
-
+  light();
+  rgb();
+  touch();
+  hierarchy();
+  
   delay(10);
 }
 
@@ -368,7 +374,7 @@ void touch() {
       Serial.println("touchstate off");
     }
   }
-  else
+  else if(digitalRead(touchsense) == LOW)
   {
     touchcheck = 0;
     delay(100);// just to make sure that when the finger comes off the output is not feathered
@@ -433,7 +439,8 @@ void light() {
 
 void rgb(){
   //this will be an error indicator in the future, but for now you get a nice purple
-  leds.setPixelColor(4, 0xFF00FF);
+  pixels.setPixelColor(0, pixels.Color(0,0,150));
+  pixels.show();
 }
 
 void hierarchy(){
@@ -452,6 +459,7 @@ void hierarchy(){
   {
     digitalWrite(relayPin, LOW);   // if Touch sensor is HIGH, then turn on
     Serial.println("light ON");
+    Serial.println(hiernew);
   }
   if (alexastate == 0 && hierchange == 1 && hierchangeamount >= 1000)
   {
