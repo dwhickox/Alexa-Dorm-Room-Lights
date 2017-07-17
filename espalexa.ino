@@ -7,18 +7,21 @@
 #include <functional>
 #include <Wire.h> //I2C library
 #include <RtcDS3231.h> //RTC library
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 // Declare function prototypes
 bool connectUDP();
 void prepareIds();
 void respondToSearch();
 void startHttpServer();
-void hierarchy();
-void light();
-void rgb();
-void timecheck();
-void touch();
-int pir();
+//void hierarchy();
+//int light();
+//void rgb();
+//void timecheck();
+//int touch();
+//int pir();
 
 //Rtc declaration
 RtcDS3231<TwoWire> rtcObject(Wire);
@@ -48,6 +51,7 @@ int hierchangeamount = 0;
 int lightcount = 0;
 int touchcount = 0;
 int pircount = 0;
+int pirState = LOW;             // we start, assuming no motion detected
 #define PIN D5
 #define LED_COUNT 1
 #define BRIGHTNESS 50
@@ -168,6 +172,13 @@ void loop() {
   pircount = pir(pircount);
   
   delay(10);
+}
+
+int absv(int val){// this is defined because abs is currently incorectly defined in the esp compiler
+  if (val < 0) {
+    val = - val;
+  return val;
+  }
 }
 
 void prepareIds() {
@@ -367,7 +378,7 @@ void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println("To setup WiFi Configuration");
 }
 
-int touch(counttouch) {
+int touch(int counttouch) {
   if (digitalRead(touchsense) == HIGH && touchcheck == 0)
   {
     touchcheck = 1;
@@ -390,7 +401,7 @@ int touch(counttouch) {
   return counttouch;
 }
 
-int light(countlight) {
+int light(int countlight) {
   if(digitalRead(lightsense) == HIGH && lightstate == 1)
   {
     if (lightcheckhigh = 0)
@@ -479,7 +490,8 @@ void hierarchy(){
   }
 }
 
-int pir(countpir){
+int pir(int countpir){
+  int val;
   val = digitalRead(pirpin);  // read input value
   if (val == HIGH) {            // check if the input is HIGH
     //digitalWrite(ledPin, HIGH);  // turn LED ON
@@ -492,7 +504,7 @@ int pir(countpir){
     }
   } else {
     //digitalWrite(ledPin, LOW); // turn LED OFF
-    if (pirState == HIGH) && abs(countpir-millis())>60000{//this may lead to a flicker if there is motion when the clock restarts after 40 days but this is very improbable
+    if ((pirState == HIGH) && abs(countpir-millis())>60000){//this may lead to a flicker if there is motion when the clock restarts after 40 days but this is very improbable
       // we have just turned of
       //Serial.println("Motion ended!");
       // We only want to print on the output change, not state
@@ -501,4 +513,3 @@ int pir(countpir){
     return countpir;
   }
 }
-
