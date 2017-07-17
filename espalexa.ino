@@ -92,7 +92,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   //added soft serial for bluetooth serial
-  blueSerial.begin(9600);
+  Serial.begin(9600);
   delay(500);
   
   pixels.begin();
@@ -191,11 +191,11 @@ void loop() {
     }
   }
   rgb();
-  //lightcount = light(lightcount); //this does not need to have a timer at this point but 
+  lightcount = light(lightcount); 
+  touch();
+  //touchcount = touch(touchcount);//this does not need to have a timer at this point but 
                                     //i may choose to have a touch on only last so long 
                                     //under some modes if nessisary
-  light();
-  touchcount = touch(touchcount);
   pircount = pir(pircount);
   hierarchy();
   delay(10);
@@ -443,22 +443,22 @@ int light(int countlight) {
   int val;
   val = digitalRead(lightsense);
   if (val == HIGH) {
-    if (lightState == HIGH) {
+    if (lightstate == HIGH) {
       // we have just turned on the light if this is at the top of the hierarchy
       Serial.println("Light detected!");
       //the reason this is flipped is becasue the output should be off when there
       //is adequate light
-      lightState = LOW;
+      lightstate = LOW;
       countlight = millis();
     }
   } else {
-    if ((lightState == LOW) && abs(countpir - millis()) > 60000) { //this may lead 
+    if ((lightstate == LOW) && abs(countlight- millis()) > 60000) { //this may lead 
       //to a flicker if there is motion when the clock restarts after 40 days but 
       //this is very improbable
       
       // the light will now turn off if something else has not overridden it
       Serial.println("Light not detected!");
-      lightState = HIGH;
+      lightstate = HIGH;
     }
     return countlight;
   }
