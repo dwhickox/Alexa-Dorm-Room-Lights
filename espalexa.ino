@@ -10,6 +10,7 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <SoftwareSerial.h>
 
 // Declare function prototypes
 bool connectUDP();
@@ -31,15 +32,24 @@ String device_name = "Dorm Light";  // Name of device
 int relayPin = D0;                        // Pin to toggle
 bool debug = false;                       // If you want debug messages
 bool squawk = true;                       // For on/off messages
-int alexastate = 0;
-int touchstate = 0;
-int timestate = 0;
-int lightstate = 0;
-//D1-D2 reserved for rtc sdl and sda respectivly
+//used fot each module of the lighting system
+int alexastate = LOW;
+int touchstate = LOW;
+int timestate = LOW;
+int lightstate = LOW;
+int pirstate = LOW;
+
+//Pin assignments
+
+//D1-D2 reserved for rtc and lcd sdl and sda respectivly
 int lightsense = D3;
 int touchsense = D4;
 int ws2812 = D5;
-int pirpin = D6;
+int pirsense = D6;
+int softTX = D7;
+int softRX = D8;
+
+//odd variables in progress of changing/removing
 int touchcheck = 0;
 int lightcheckhigh = 0;
 int lightchecklow = 0;
@@ -48,13 +58,20 @@ int hierchange = 0;
 int hierold = 0;
 int hiernew = 0;
 int hierchangeamount = 0;
+
+// counts since a change, this allows for propper hierachical change and
+// timeout delays
 int lightcount = 0;
 int touchcount = 0;
 int pircount = 0;
-int pirState = LOW;             // we start, assuming no motion detected
 #define PIN D5
 #define LED_COUNT 1
 #define BRIGHTNESS 50
+
+//setup the bluetooth softserial, soft serial is used to allow programming without
+//removing the bluetooth module (and transmition faster that 115200 is not
+//required for a simple on off signal
+SoftwareSerial blueSerial(softRX, softTX); // RX, TX
 
 //Setup the ws2812 indicator
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800);
@@ -74,14 +91,21 @@ void setup() {
   // Begin Serial:
   Serial.begin(115200);
   delay(1000);
+  //added soft serial for bluetooth serial
+  blueSerial.begin(9600);
+  delay(500);
+  
   pixels.begin();
   pixels.show(); // Initialize all pixels to 'off'
   Serial.println("pixels cleared");
-  delay(4000);
+  delay(1000);
+  
   //sets up rtc
   rtcObject.Begin();    //Starts I2C
   RtcDateTime currentTime = RtcDateTime(17, 06, 07, 12, 50, 0); //define date and time object
   rtcObject.SetDateTime(currentTime);
+  Serial.println("RTC setup");
+  
   //Setup the pins for input
   pinMode(lightsense, INPUT);
   pinMode(touchsense, INPUT);
@@ -90,12 +114,13 @@ void setup() {
   pinMode(ws2812, OUTPUT);
   digitalWrite(ws2812, LOW); // makes sure there is no odd data in the led
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, HIGH); // Start with light on
-  //  digitalWrite(relayPin, LOW); // Start with light off
+  digitalWrite(relayPin, HIGH); // Start with light off
+  //  digitalWrite(relayPin, LOW); // Start with light on
+  //this assumes you use a relay that is high off, and low on
 
   //setup the input pir pin
-  pinMode(pirpin, INPUT);     // declare sensor as input
-  
+  pinMode(pirsense, INPUT);     // declare sensor as input
+
   // Set the UUIDs and socket information:
   prepareIds();
 
@@ -165,19 +190,21 @@ void loop() {
       }
     }
   }
-  lightcount = light(lightcount);
   rgb();
+  //lightcount = light(lightcount); //this does not need to have a timer at this point but 
+                                    //i may choose to have a touch on only last so long 
+                                    //under some modes if nessisary
+  light();
   touchcount = touch(touchcount);
-  hierarchy();
   pircount = pir(pircount);
-  
+  hierarchy();
   delay(10);
 }
 
-int absv(int val){// this is defined because abs is currently incorectly defined in the esp compiler
+int absv(int val) { // this is defined because abs is currently incorectly defined in the esp compiler
   if (val < 0) {
     val = - val;
-  return val;
+    return val;
   }
 }
 
@@ -378,106 +405,144 @@ void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println("To setup WiFi Configuration");
 }
 
-int touch(int counttouch) {
-  if (digitalRead(touchsense) == HIGH && touchcheck == 0)
+//int touch(int counttouch) {
+void touch() { //this may need timing in the future for proper control
+  int val;
+  int val1;
+  //the combination of these two make sure the input is not a missfire or feathered on
+  val = digitalRead(touchsense);
+  if (val == HIGH && touchcheck == 0)
   {
-    touchcheck = 1;
-    if (touchstate == 0)
+    delay(5);
+    val1 = digitalRead(touchsense);
+    if (val1 == HIGH)
     {
-      touchstate = 1;
-      Serial.println("touchstate on");
-    }
-    else
-    {
-      touchstate = 0;
-      Serial.println("touchstate off");
+      touchcheck = 1;
+      if (touchstate == LOW)
+      {
+        touchstate = HIGH;
+        Serial.println("touchstate on");
+      }
+      else
+      {
+        touchstate = LOW;
+        Serial.println("touchstate off");
+      }
     }
   }
-  else if(digitalRead(touchsense) == LOW)
+
+  else if (val == LOW)
   {
     touchcheck = 0;
     delay(100);// just to make sure that when the finger comes off the output is not feathered
   }
-  return counttouch;
+  //return counttouch; //not curently used for timing maybe in the future
 }
 
 int light(int countlight) {
-  if(digitalRead(lightsense) == HIGH && lightstate == 1)
-  {
-    if (lightcheckhigh = 0)
-    {
-      lightchecklow = 0;
-      lightcheckhigh = 1;
-      lightmilli = millis();
+  int val;
+  val = digitalRead(lightsense);
+  if (val == HIGH) {
+    if (lightState == HIGH) {
+      // we have just turned on the light if this is at the top of the hierarchy
+      Serial.println("Light detected!");
+      //the reason this is flipped is becasue the output should be off when there
+      //is adequate light
+      lightState = LOW;
+      countlight = millis();
     }
-    else
-    {
-      if (millis - lightmilli < 0)
-      {
-        lightmilli = millis();
-      }
-      else if (millis() - lightmilli >= 60000)
-      {
-        lightcheckhigh = 0;
-        lightstate == 0;
-        Serial.println("lightstate off");
-      }
+  } else {
+    if ((lightState == LOW) && abs(countpir - millis()) > 60000) { //this may lead 
+      //to a flicker if there is motion when the clock restarts after 40 days but 
+      //this is very improbable
+      
+      // the light will now turn off if something else has not overridden it
+      Serial.println("Light not detected!");
+      lightState = HIGH;
     }
+    return countlight;
   }
-  else if(digitalRead(lightsense) == HIGH && lightstate == 0)
-  {
-    lightchecklow = 0;
-    lightcheckhigh = 0;
-  }
-  else if(digitalRead(lightsense) == LOW && lightstate == 0)
-  {
-    if (lightchecklow = 0)
+
+
+
+
+  /*  if(digitalRead(lightsense) == HIGH && lightstate == 1)
     {
-      lightchecklow = 1;
-      lightcheckhigh = 0;
-      lightmilli = millis();
-    }
-    else
-    {
-      if (millis - lightmilli < 0)
-      {
-        lightmilli = millis();
-      }
-      else if ((millis() - lightmilli) >= 60000)
+      if (lightcheckhigh = 0)
       {
         lightchecklow = 0;
-        lightstate == 1;
-        Serial.println("lightstate on");
+        lightcheckhigh = 1;
+        lightmilli = millis();
+      }
+      else
+      {
+        if (millis - lightmilli < 0)
+        {
+          lightmilli = millis();
+        }
+        else if (millis() - lightmilli >= 60000)
+        {
+          lightcheckhigh = 0;
+          lightstate == 0;
+          Serial.println("lightstate off");
+        }
       }
     }
-  }
-  else if(digitalRead(lightsense) == LOW && lightstate == 1)
-  {
-    lightchecklow = 0;
-    lightcheckhigh = 0;
-  }
-  return countlight;
-}
+    else if(digitalRead(lightsense) == HIGH && lightstate == 0)
+    {
+      lightchecklow = 0;
+      lightcheckhigh = 0;
+    }
+    else if(digitalRead(lightsense) == LOW && lightstate == 0)
+    {
+      if (lightchecklow = 0)
+      {
+        lightchecklow = 1;
+        lightcheckhigh = 0;
+        lightmilli = millis();
+      }
+      else
+      {
+        if (millis - lightmilli < 0)
+        {
+          lightmilli = millis();
+        }
+        else if ((millis() - lightmilli) >= 60000)
+        {
+          lightchecklow = 0;
+          lightstate == 1;
+          Serial.println("lightstate on");
+        }
+      }
+    }
+    else if(digitalRead(lightsense) == LOW && lightstate == 1)
+    {
+      lightchecklow = 0;
+      lightcheckhigh = 0;
+    }
+    return countlight;
+  */
 
-void rgb(){
+}
+void rgb() {
   //this will be an error indicator in the future, but for now you get a nice purple
-  pixels.setPixelColor(0, pixels.Color(60,0,50));
+  pixels.setPixelColor(0, pixels.Color(50, 0, 50));
   pixels.show();
 }
 
-void hierarchy(){
+void hierarchy() {
   //key alexastate, touchstate, timestate, lightstate
-  //binary 4 digets 
-  hiernew = alexastate*1000+touchstate*100+timestate*10+lightstate;
-  
+  //binary 4 digets
+  hiernew = alexastate * 1000 + touchstate * 100 + timestate * 10 + lightstate;
+
   if (hierold != hiernew)
   {
     hierchange = 1;
     hierchangeamount = abs(hiernew - hierold);
     hierold = hiernew;
   }
-  
-  if ((alexastate == 1 || touchstate == 1 || timestate == 1 || lightstate == 1) and hierchange == 1)
+
+  if ((alexastate == HIGH || touchstate == HIGH || timestate == HIGH || lightstate == HIGH || pirstate == HIGH) and hierchange == 1)
   {
     digitalWrite(relayPin, LOW);   // if Touch sensor is HIGH, then turn on
     Serial.println("light ON");
@@ -490,25 +555,21 @@ void hierarchy(){
   }
 }
 
-int pir(int countpir){
+int pir(int countpir) {
   int val;
-  val = digitalRead(pirpin);  // read input value
-  if (val == HIGH) {            // check if the input is HIGH
-    //digitalWrite(ledPin, HIGH);  // turn LED ON
-    if (pirState == LOW) {
-      // we have just turned on
-      //Serial.println("Motion detected!");
-      // We only want to print on the output change, not state
-      pirState = HIGH;
+  val = digitalRead(pirsense);
+  if (val == HIGH) {
+    if (pirstate == LOW) {
+      // we have just turned on the light if this is at the top of the hierarchy
+      Serial.println("Motion detected!");
+      pirstate = HIGH;
       countpir = millis();
     }
   } else {
-    //digitalWrite(ledPin, LOW); // turn LED OFF
-    if ((pirState == HIGH) && abs(countpir-millis())>60000){//this may lead to a flicker if there is motion when the clock restarts after 40 days but this is very improbable
-      // we have just turned of
-      //Serial.println("Motion ended!");
-      // We only want to print on the output change, not state
-      pirState = LOW;
+    if ((pirstate == HIGH) && abs(countpir - millis()) > 60000) { //this may lead to a flicker if there is motion when the clock restarts after 40 days but this is very improbable
+      // the light will now turn off if something else has not overridden it
+      Serial.println("Motion ended!");
+      pirstate = LOW;
     }
     return countpir;
   }
