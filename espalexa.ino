@@ -481,7 +481,43 @@ void touch() { //this may need timing in the future for proper control
   int val1;
   //the combination of these two make sure the input is not a missfire or feathered on
   val = digitalRead(touchsense);
-  if (val == HIGH && touchcheck == 0)
+  delay(10); // this value can be adjusted based on how much anti feathering you want, 
+  //but you will have to hold the button longer to get the light to trigger on
+  val1 = digitalRead(touchsense);
+  if (val == HIGH && val1 == HIGH)// checks to see if the finger has been on the switch
+  //for more than the delay, this is to reduce the chance of missfires, if it still miss
+  //fires increase the time limit, and add another check, if that doesnt help, rewrite 
+  //the function to use counttouch to make sure it hase been preessed every cycle for a 
+  //certain time
+  {
+    if (touchcheck == 0)//checks to make sure that the finger has left the button before 
+    //(prevents on off on off while holding the button)
+    {
+      if (touchstate == LOW)
+      {
+        touchstate = HIGH;
+        Serial.println("touchstate on");\
+        touchcheck = 1;
+      }
+      else
+      {
+        touchstate == LOW;
+        Serial.println("touchstate off");
+        touchcheck = 1;
+      }
+    }
+  }
+  else if (val == HIGH || val1 == HIGH)
+  {
+    //insert code here if something is needed when only one is on
+  }
+  else if (val == LOW && val1 == LOW)
+  {
+    touchcheck = 0;
+    delay(100);
+    //allow the finger time to come off the button
+  }
+  /*if (val == HIGH && touchcheck == 0)
   {
     delay(5);
     val1 = digitalRead(touchsense);
@@ -506,6 +542,7 @@ void touch() { //this may need timing in the future for proper control
     touchcheck = 0;
     delay(100);// just to make sure that when the finger comes off the output is not feathered
   }
+  */
   //return counttouch; //not curently used for timing maybe in the future
 }
 
@@ -513,14 +550,14 @@ int light(int countlight) {
   int brightness;
   // PLEASE NOTE BRIGHTNESS IS LOW WHEN THE SENSOR SEES LIGHT!
   int milli;
-  val = digitalRead(lightsense);
+  brightness = digitalRead(lightsense);
   milli = millis();
   //Serial.println(val);
   if (brightness == LOW) {
     if (bulbstate == LOW) {
       countlight = millis();
     }
-    else if (bulbstate == HIGH && abs(countlight - milli) > 60000)) {
+    else if (bulbstate == HIGH && abs(countlight - milli) > 60000) {
       // we have just turned on the light if this is at the top of the hierarchy
       Serial.println("Light detected!");
       //the reason this is flipped is becasue the output should be off when there
@@ -531,7 +568,7 @@ int light(int countlight) {
     }
   } else {
     if (bulbstate == HIGH) {
-      countlight = millis()
+      countlight = millis();
     }
     else if ((bulbstate == LOW) && abs(countlight - milli) > 60000) {
       //Serial.println("abscheck");
