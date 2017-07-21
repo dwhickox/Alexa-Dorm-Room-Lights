@@ -1,4 +1,4 @@
-#include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -52,12 +52,11 @@ int relayPin = D0;                        // Pin for relay control
 //D1-D2 reserved for rtc and lcd sdl and sda respectivly
 int lightsense = D3;                      // Pin for light sensor dat
 int touchsense = D4;                      // Pin for touch sensor dat
-int ws2812 = D5;                          // Pin for led control
-int pirsense = D6;                        // Pin for pir sensor dat
+int pirsense = D5;                        // Pin for pir sensor dat
 
 //pins for software tx
-int softRX = D7;
-int softTX = D8;
+int softRX = D6;
+int softTX = D7;
 
 //odd variables in progress of changing/removing
 int touchcheck = 0;
@@ -75,9 +74,9 @@ int lightcount = 0;
 int touchcount = 0;
 int pircount = 0;
 int rgbcount = 0;
-#define PIN D5
-#define LED_COUNT 1
-#define BRIGHTNESS 50
+//#define PIN D5
+//#define LED_COUNT 1
+//#define BRIGHTNESS 50
 
 //setup the bluetooth softserial, soft serial is used to allow programming without
 //removing the bluetooth module (and transmition faster that 115200 is not
@@ -85,7 +84,7 @@ int rgbcount = 0;
 SoftwareSerial blueSerial(softRX, softTX); // RX, TX
 
 //Setup the ws2812 indicator
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800);
+//Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800);
 
 // Some UDP / WeMo specific variables:
 WiFiUDP UDP;
@@ -106,10 +105,10 @@ void setup() {
   blueSerial.begin(9600);
   delay(500);
 
-  pixels.begin();
-  pixels.show(); // Initialize all pixels to 'off'
-  Serial.println("pixels cleared");
-  delay(500);
+  //pixels.begin();
+  //pixels.show(); // Initialize all pixels to 'off'
+  //Serial.println("pixels cleared");
+  //delay(500);
 
   //sets up rtc
   rtcObject.Begin();    //Starts I2C
@@ -213,13 +212,15 @@ void loop() {
       }
     }
   }
-  rgbcount = rgb(rgbcount);
+  //rgbcount = rgb(rgbcount);// this was removed because the led is the only thing that\
+  //requires a level converter to run so it was removed and it was useless anyway
   //Serial.println("lightcount before light");
   //Serial.println(lightcount);
   lightcount = light(lightcount);
   //Serial.println("lightcount after light");
   //Serial.println(lightcount);
-  touch();
+  //touch(); this has been removed because i do not have a working touch sensor with 
+  //me at this time so i cannot properly test the code
   //touchcount = touch(touchcount);//this does not need to have a timer at this point but
   //i may choose to have a touch on only last so long
   //under some modes if nessisary
@@ -611,7 +612,7 @@ int light(int countlight) {
   */
 
 }
-int rgb(int countrgb) {
+/*int rgb(int countrgb) {
   //this will be an error indicator in the future, but for now you get a nice purple
   int milli = millis();
   if ( abs(countrgb- milli)>1000)
@@ -622,7 +623,7 @@ int rgb(int countrgb) {
   }
   return countrgb;
 }
-
+*/
 void hierarchy() {
   //key pirstate, alexastate, touchstate, timestate, bulbstate
   //binary 4 digets
